@@ -62,9 +62,9 @@ def plotly_bloch_sphere(bloch_vector):
         hovertext=f'({bx:.3f}, {by:.3f}, {bz:.3f})'
     )
     axis_lines = [
-        go.Scatter3d(x=[-1.1,1.1], y=[0,0], z=[0,0], mode='lines', line=dict(color='white', width=4), name='X-axis'),
-        go.Scatter3d(x=[0,0], y=[-1.1,1.1], z=[0,0], mode='lines', line=dict(color='lime', width=4), name='Y-axis'),
-        go.Scatter3d(x=[0,0], y=[0,0], z=[-1.1,1.1], mode='lines', line=dict(color='lightblue', width=4), name='Z-axis')
+        go.Scatter3d(x=[-1.1,1.1], y=[0,0], z=[0,0], mode='lines', line=dict(color='red', width=4), name='X-axis'),
+        go.Scatter3d(x=[0,0], y=[-1.1,1.1], z=[0,0], mode='lines', line=dict(color='green', width=4), name='Y-axis'),
+        go.Scatter3d(x=[0,0], y=[0,0], z=[-1.1,1.1], mode='lines', line=dict(color='blue', width=4), name='Z-axis')
     ]
     annotations = [
         dict(showarrow=False, x=1.1, y=0, z=0, text="X", font=dict(color="red", size=16)),
@@ -73,17 +73,17 @@ def plotly_bloch_sphere(bloch_vector):
     ]
     layout = go.Layout(
         scene=dict(
-            xaxis=dict(range=[-1.2,1.2], title='X', autorange=False, showbackground=True, backgroundcolor="#e0f7fa"),
-            yaxis=dict(range=[-1.2,1.2], title='Y', autorange=False, showbackground=True, backgroundcolor="#e0f7fa"),
-            zaxis=dict(range=[-1.2,1.2], title='Z', autorange=False, showbackground=True, backgroundcolor="#e0f7fa"),
+            xaxis=dict(range=[-1.2,1.2], showbackground=True, backgroundcolor="#e0f7fa"),
+            yaxis=dict(range=[-1.2,1.2], showbackground=True, backgroundcolor="#e0f7fa"),
+            zaxis=dict(range=[-1.2,1.2], showbackground=True, backgroundcolor="#e0f7fa"),
             aspectmode='cube',
             annotations=annotations
         ),
         margin=dict(l=0, r=0, b=0, t=30),
-        height=550,
-        width=550,
-        showlegend=True,
-        title="3D Interactive Bloch Sphere Visualization"
+        height=500,
+        width=500,
+        showlegend=False,
+        title="Bloch Sphere"
     )
     fig = go.Figure(data=[sphere, vector] + axis_lines, layout=layout)
     return fig
@@ -118,20 +118,15 @@ if st.button("Simulate & Visualize"):
                 st.subheader("Bloch Sphere Visualizations")
 
                 n = len(bloch_vectors)
-                cols = st.columns(min(n, 4))
-
                 for idx, bv_dict in enumerate(bloch_vectors):
                     qubit = bv_dict["qubit"]
                     bv = bv_dict["bloch_vector"]
-                    col = cols[idx % 4]
-                    with col:
-                        st.markdown(f"### Qubit {qubit}")
-                        fig = plotly_bloch_sphere(bv)
-                        st.plotly_chart(fig, use_container_width=True, key=f"bloch_{qubit}")
-
-                        purity = sum(coord**2 for coord in bv)
-                        st.write(f"Bloch Vector: (x={bv[0]:.3f}, y={bv[1]:.3f}, z={bv[2]:.3f})")
-                        st.write(f"Purity: {purity:.3f} (1 means pure state)")
+                    st.markdown(f"### Qubit {qubit}")
+                    fig = plotly_bloch_sphere(bv)
+                    st.plotly_chart(fig, use_container_width=True, key=f"bloch_{qubit}")
+                    purity = sum(coord**2 for coord in bv)
+                    st.write(f"Bloch Vector: (x={bv[0]:.3f}, y={bv[1]:.3f}, z={bv[2]:.3f})")
+                    st.write(f"Purity: {purity:.3f} (1 means pure state)")
 
                 st.markdown("---")
                 st.subheader("Full Statevector (Real, Imaginary)")
