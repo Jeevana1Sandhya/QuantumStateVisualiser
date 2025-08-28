@@ -1,6 +1,6 @@
 streamlit
-plotly
-numpy
-matplotlib
 qiskit
-qiskit-aer
+numpy
+plotly
+matplotlib
+pylatexenc
