@@ -1,0 +1,8 @@
+streamlit
+requests
+plotly
+numpy
+matplotlib
+flask
+qiskit
+qiskit-aer
