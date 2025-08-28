@@ -4,10 +4,7 @@ from qiskit_aer import Aer
 from qiskit.quantum_info import DensityMatrix, partial_trace
 import numpy as np
 import plotly.graph_objects as go
-from qiskit.visualization import plot_bloch_vector
-import matplotlib.pyplot as plt
 
-# --------- Helper functions ---------
 def bloch_vector_from_reduced_dm(reduced_dm):
     pauli_x = np.array([[0,1], [1,0]])
     pauli_y = np.array([[0,-1j], [1j,0]])
@@ -55,28 +52,30 @@ def plotly_bloch_sphere(bloch_vector):
         hoverinfo='skip'
     )
     bx, by, bz = bloch_vector
-    vector_line = go.Scatter3d(
+    vector = go.Scatter3d(
         x=[0, bx], y=[0, by], z=[0, bz],
         mode='lines+markers',
         line=dict(color='black', width=6),
         marker=dict(size=6, color='black'),
-        name='Bloch Vector'
+        name='Bloch Vector',
+        hoverinfo='text',
+        hovertext=f'({bx:.3f}, {by:.3f}, {bz:.3f})'
     )
     axis_lines = [
-        go.Scatter3d(x=[-1.2,1.2], y=[0,0], z=[0,0], mode='lines', line=dict(color='red', width=4), name='X-axis'),
-        go.Scatter3d(x=[0,0], y=[-1.2,1.2], z=[0,0], mode='lines', line=dict(color='green', width=4), name='Y-axis'),
-        go.Scatter3d(x=[0,0], y=[0,0], z=[-1.2,1.2], mode='lines', line=dict(color='blue', width=4), name='Z-axis')
+        go.Scatter3d(x=[-1.1,1.1], y=[0,0], z=[0,0], mode='lines', line=dict(color='red', width=4), name='X-axis'),
+        go.Scatter3d(x=[0,0], y=[-1.1,1.1], z=[0,0], mode='lines', line=dict(color='green', width=4), name='Y-axis'),
+        go.Scatter3d(x=[0,0], y=[0,0], z=[-1.1,1.1], mode='lines', line=dict(color='blue', width=4), name='Z-axis')
     ]
     annotations = [
-        dict(showarrow=False, x=1.25, y=0, z=0, text="X", font=dict(color="red", size=16)),
-        dict(showarrow=False, x=0, y=1.25, z=0, text="Y", font=dict(color="green", size=16)),
-        dict(showarrow=False, x=0, y=0, z=1.25, text="Z", font=dict(color="blue", size=16)),
+        dict(showarrow=False, x=1.1, y=0, z=0, text="X", font=dict(color="red", size=16)),
+        dict(showarrow=False, x=0, y=1.1, z=0, text="Y", font=dict(color="green", size=16)),
+        dict(showarrow=False, x=0, y=0, z=1.1, text="Z", font=dict(color="blue", size=16)),
     ]
     layout = go.Layout(
         scene=dict(
-            xaxis=dict(range=[-1.3,1.3], showbackground=True, backgroundcolor="#e0f7fa"),
-            yaxis=dict(range=[-1.3,1.3], showbackground=True, backgroundcolor="#e0f7fa"),
-            zaxis=dict(range=[-1.3,1.3], showbackground=True, backgroundcolor="#e0f7fa"),
+            xaxis=dict(range=[-1.2,1.2], showbackground=True, backgroundcolor="#e0f7fa"),
+            yaxis=dict(range=[-1.2,1.2], showbackground=True, backgroundcolor="#e0f7fa"),
+            zaxis=dict(range=[-1.2,1.2], showbackground=True, backgroundcolor="#e0f7fa"),
             aspectmode='cube',
             annotations=annotations
         ),
@@ -84,12 +83,11 @@ def plotly_bloch_sphere(bloch_vector):
         height=500,
         width=500,
         showlegend=False,
-        title="3D Bloch Sphere"
+        title="Bloch Sphere"
     )
-    fig = go.Figure(data=[sphere, vector_line] + axis_lines, layout=layout)
+    fig = go.Figure(data=[sphere, vector] + axis_lines, layout=layout)
     return fig
 
-# --------- Streamlit UI ---------
 st.title("Quantum Circuit Bloch Sphere Visualizer")
 
 qasm_input = st.text_area("Edit Quantum Circuit QASM here:", height=200, value="""
@@ -109,7 +107,6 @@ if st.button("Simulate & Visualize"):
             if error:
                 st.error(f"Simulation error: {error}")
             else:
-                # Circuit Diagram
                 try:
                     qc = QuantumCircuit.from_qasm_str(qasm_input)
                     st.subheader("Quantum Circuit Diagram")
@@ -118,31 +115,15 @@ if st.button("Simulate & Visualize"):
                     st.warning(f"Unable to draw circuit diagram: {e}")
 
                 st.markdown("---")
-                st.subheader("Bloch Sphere Visualizations (3D + 2D)")
+                st.subheader("Bloch Sphere Visualizations")
 
+                n = len(bloch_vectors)
                 for idx, bv_dict in enumerate(bloch_vectors):
                     qubit = bv_dict["qubit"]
                     bv = bv_dict["bloch_vector"]
                     st.markdown(f"### Qubit {qubit}")
-
-                    # Side-by-side columns
-                    col1, col2 = st.columns(2)
-
-                    # 3D Bloch sphere
-                    with col1:
-                        st.markdown("**3D Interactive Bloch Sphere**")
-                        fig3d = plotly_bloch_sphere(bv)
-                        st.plotly_chart(fig3d, use_container_width=True, key=f"bloch3d_{qubit}")
-
-                    # 2D Bloch sphere
-                    with col2:
-                        st.markdown("**2D Bloch Sphere**")
-                        fig2d, ax = plt.subplots(figsize=(4,4))
-                        plot_bloch_vector(bv, ax=ax)
-                        st.pyplot(fig2d)
-                        plt.close(fig2d)
-
-                    # Purity info
+                    fig = plotly_bloch_sphere(bv)
+                    st.plotly_chart(fig, use_container_width=True, key=f"bloch_{qubit}")
                     purity = sum(coord**2 for coord in bv)
                     st.write(f"Bloch Vector: (x={bv[0]:.3f}, y={bv[1]:.3f}, z={bv[2]:.3f})")
                     st.write(f"Purity: {purity:.3f} (1 means pure state)")

@@ -2,5 +2,5 @@ streamlit
 qiskit
 numpy
 plotly
-matplotlib==3.5.3
+matplotlib
 pylatexenc
