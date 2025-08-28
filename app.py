@@ -25,21 +25,29 @@ def run_quantum_simulation(qasm_str):
         result = sim.run(qc).result()
         data_result = result.data(0)
         if 'statevector' not in data_result:
-            return None, None, f"Statevector not found in result keys: {list(data_result.keys())}"
+            return None, None, None, f"Statevector not found in result keys: {list(data_result.keys())}"
         statevector = data_result['statevector']
         dm = DensityMatrix(statevector)
         statevector_json = complex_to_json(statevector)
         num_qubits = qc.num_qubits
-        bloch_vectors = []
+        results = []
         for i in range(num_qubits):
             reduced = partial_trace(dm, [j for j in range(num_qubits) if j != i])
             bv = bloch_vector_from_reduced_dm(reduced)
-            bloch_vectors.append({'qubit': i, 'bloch_vector': bv})
-        return bloch_vectors, statevector_json, None
+            rho = reduced.data / np.trace(reduced.data)  # normalize
+            purity = float(np.real(np.trace(rho @ rho)))
+            length = float(np.linalg.norm(bv))
+            results.append({
+                'qubit': i,
+                'bloch_vector': bv,
+                'purity': purity,
+                'length': length
+            })
+        return results, statevector_json, dm, None
     except Exception as e:
-        return None, None, str(e)
+        return None, None, None, str(e)
 
-def plotly_bloch_sphere(bloch_vector):
+def plotly_bloch_sphere(bloch_vector, purity, length):
     u, v = np.mgrid[0:2*np.pi:80j, 0:np.pi:40j]
     x = np.cos(u)*np.sin(v)
     y = np.sin(u)*np.sin(v)
@@ -52,15 +60,32 @@ def plotly_bloch_sphere(bloch_vector):
         hoverinfo='skip'
     )
     bx, by, bz = bloch_vector
-    vector = go.Scatter3d(
-        x=[0, bx], y=[0, by], z=[0, bz],
-        mode='lines+markers',
-        line=dict(color='black', width=6),
-        marker=dict(size=6, color='black'),
-        name='Bloch Vector',
-        hoverinfo='text',
-        hovertext=f'({bx:.3f}, {by:.3f}, {bz:.3f})'
-    )
+    data = [sphere]
+
+    if length > 1e-6:
+        # Draw arrow if vector has non-zero length
+        vector = go.Scatter3d(
+            x=[0, bx], y=[0, by], z=[0, bz],
+            mode='lines+markers',
+            line=dict(color='black', width=6),
+            marker=dict(size=6, color='black'),
+            name='Bloch Vector',
+            hoverinfo='text',
+            hovertext=f'({bx:.3f}, {by:.3f}, {bz:.3f})'
+        )
+        data.append(vector)
+    else:
+        # Draw dot at origin for maximally mixed state
+        dot = go.Scatter3d(
+            x=[0], y=[0], z=[0],
+            mode='markers',
+            marker=dict(size=8, color='black', symbol='circle'),
+            name='Mixed State',
+            hoverinfo='text',
+            hovertext=f'Maximally Mixed (Purity={purity:.3f})'
+        )
+        data.append(dot)
+
     axis_lines = [
         go.Scatter3d(x=[-1.1,1.1], y=[0,0], z=[0,0], mode='lines', line=dict(color='red', width=4), name='X-axis'),
         go.Scatter3d(x=[0,0], y=[-1.1,1.1], z=[0,0], mode='lines', line=dict(color='green', width=4), name='Y-axis'),
@@ -85,8 +110,10 @@ def plotly_bloch_sphere(bloch_vector):
         showlegend=False,
         title="Bloch Sphere"
     )
-    fig = go.Figure(data=[sphere, vector] + axis_lines, layout=layout)
+    fig = go.Figure(data=data + axis_lines, layout=layout)
     return fig
+
+# ---------------- Streamlit App ----------------
 
 st.title("Quantum Circuit Bloch Sphere Visualizer")
 
@@ -103,7 +130,7 @@ if st.button("Simulate & Visualize"):
         st.error("Please enter a valid QASM circuit.")
     else:
         with st.spinner("Simulating quantum circuit..."):
-            bloch_vectors, full_statevector, error = run_quantum_simulation(qasm_input)
+            results, full_statevector, dm, error = run_quantum_simulation(qasm_input)
             if error:
                 st.error(f"Simulation error: {error}")
             else:
@@ -117,16 +144,19 @@ if st.button("Simulate & Visualize"):
                 st.markdown("---")
                 st.subheader("Bloch Sphere Visualizations")
 
-                n = len(bloch_vectors)
-                for idx, bv_dict in enumerate(bloch_vectors):
-                    qubit = bv_dict["qubit"]
-                    bv = bv_dict["bloch_vector"]
+                for res in results:
+                    qubit = res["qubit"]
+                    bv = res["bloch_vector"]
+                    purity = res["purity"]
+                    length = res["length"]
+
                     st.markdown(f"### Qubit {qubit}")
-                    fig = plotly_bloch_sphere(bv)
+                    fig = plotly_bloch_sphere(bv, purity, length)
                     st.plotly_chart(fig, use_container_width=True, key=f"bloch_{qubit}")
-                    purity = sum(coord**2 for coord in bv)
+
                     st.write(f"Bloch Vector: (x={bv[0]:.3f}, y={bv[1]:.3f}, z={bv[2]:.3f})")
-                    st.write(f"Purity: {purity:.3f} (1 means pure state)")
+                    st.write(f"Bloch Vector Length: {length:.3f}")
+                    st.write(f"Purity: {purity:.3f} (1 = pure, {1/(2**1):.3f} = maximally mixed for 1 qubit)")
 
                 st.markdown("---")
                 st.subheader("Full Statevector (Real, Imaginary)")
