@@ -1,5 +1,6 @@
 import streamlit as st
-from qiskit import QuantumCircuit, Aer, transpile
+from qiskit import QuantumCircuit, transpile
+from qiskit_aer import Aer
 from qiskit.visualization import plot_histogram
 from qiskit.quantum_info import DensityMatrix, partial_trace, Statevector
 from qiskit.providers.aer.noise import NoiseModel, depolarizing_error
