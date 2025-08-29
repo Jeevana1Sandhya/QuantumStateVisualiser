@@ -1,9 +1,9 @@
 import streamlit as st
 from qiskit import QuantumCircuit, transpile
 from qiskit_aer import Aer
+from qiskit_aer.noise import NoiseModel, depolarizing_error
 from qiskit.visualization import plot_histogram
 from qiskit.quantum_info import DensityMatrix, partial_trace, Statevector
-from qiskit_aer.noise import NoiseModel, depolarizing_error
 import numpy as np
 import plotly.graph_objects as go
 import matplotlib.pyplot as plt
@@ -19,16 +19,13 @@ def bloch_vector_from_reduced_dm(reduced_dm):
     bz = np.real(np.trace(reduced_dm.data @ pauli_z))
     return [bx, by, bz]
 
-def complex_to_json(data):
-    return [[c.real, c.imag] for c in data]
-
 def run_quantum_simulation(qc, noisy=False):
     try:
         backend = Aer.get_backend("aer_simulator")
         if noisy:
             noise_model = NoiseModel()
-            error = depolarizing_error(0.05, 1)  # 5% depolarizing error
-            noise_model.add_all_qubit_quantum_error(error, ["u1", "u2", "u3", "cx"])
+            error = depolarizing_error(0.05, 1)
+            noise_model.add_all_qubit_quantum_error(error, ["rx","ry","rz","cx","x","y","z","h"])
             result = backend.run(transpile(qc, backend), noise_model=noise_model).result()
         else:
             qc.save_statevector()
@@ -88,60 +85,77 @@ def plotly_bloch_sphere(bloch_vector, purity, length):
 
 st.title("🌀 Quantum State Visualizer")
 
-# Sidebar: Build circuit with gates
-st.sidebar.header("⚡ Build Your Quantum Circuit")
-num_qubits = st.sidebar.number_input("Number of qubits:", 1, 3, 1)
-qc = QuantumCircuit(num_qubits)
+mode = st.radio("Choose Input Mode:", ["QASM Input", "Interactive Builder"])
 
-# Choose gates interactively
-gate = st.sidebar.selectbox("Add a gate:", ["None", "H", "X", "Y", "Z", "RX", "RY", "RZ", "CX"])
-target = st.sidebar.number_input("Target qubit:", 0, num_qubits-1, 0)
+if mode == "QASM Input":
+    qasm_input = st.text_area("Paste Quantum Circuit QASM here:", height=200, value="""
+OPENQASM 2.0;
+include "qelib1.inc";
+qreg q[2];
+h q[0];
+cx q[0], q[1];
+""")
+    qc = None
+    if st.button("Load QASM"):
+        try:
+            qc = QuantumCircuit.from_qasm_str(qasm_input)
+            st.success("QASM loaded successfully!")
+        except Exception as e:
+            st.error(f"Error parsing QASM: {e}")
 
-if gate in ["RX", "RY", "RZ"]:
-    angle = st.sidebar.slider("Rotation angle (radians)", 0.0, 2*np.pi, np.pi/2.0)
+elif mode == "Interactive Builder":
+    st.sidebar.header("⚡ Build Your Circuit")
+    num_qubits = st.sidebar.number_input("Number of qubits:", 1, 3, 1)
+    qc = QuantumCircuit(num_qubits)
 
-if gate == "CX" and num_qubits > 1:
-    control = st.sidebar.number_input("Control qubit:", 0, num_qubits-1, 0)
+    gate = st.sidebar.selectbox("Add a gate:", ["None", "H", "X", "Y", "Z", "RX", "RY", "RZ", "CX"])
+    target = st.sidebar.number_input("Target qubit:", 0, num_qubits-1, 0)
 
-if st.sidebar.button("Apply Gate"):
-    if gate == "H": qc.h(target)
-    elif gate == "X": qc.x(target)
-    elif gate == "Y": qc.y(target)
-    elif gate == "Z": qc.z(target)
-    elif gate == "RX": qc.rx(angle, target)
-    elif gate == "RY": qc.ry(angle, target)
-    elif gate == "RZ": qc.rz(angle, target)
-    elif gate == "CX" and num_qubits > 1: qc.cx(control, target)
+    if gate in ["RX", "RY", "RZ"]:
+        angle = st.sidebar.slider("Rotation angle (radians)", 0.0, 2*np.pi, np.pi/2.0)
 
-st.subheader("Quantum Circuit Diagram")
-st.pyplot(qc.draw(output="mpl"))
+    if gate == "CX" and num_qubits > 1:
+        control = st.sidebar.number_input("Control qubit:", 0, num_qubits-1, 0)
 
-# Noise option
-noisy = st.checkbox("Enable Noise (Depolarizing)", value=False)
+    if st.sidebar.button("Apply Gate"):
+        if gate == "H": qc.h(target)
+        elif gate == "X": qc.x(target)
+        elif gate == "Y": qc.y(target)
+        elif gate == "Z": qc.z(target)
+        elif gate == "RX": qc.rx(angle, target)
+        elif gate == "RY": qc.ry(angle, target)
+        elif gate == "RZ": qc.rz(angle, target)
+        elif gate == "CX": qc.cx(control, target)
 
-if st.button("Simulate & Visualize"):
-    with st.spinner("Running simulation..."):
-        results, statevector, dm, error = run_quantum_simulation(qc, noisy=noisy)
+if qc:
+    st.subheader("Quantum Circuit Diagram")
+    st.pyplot(qc.draw(output="mpl"))
 
-    if error:
-        st.error(f"Error: {error}")
-    else:
-        st.subheader("🧮 Statevector Representation")
-        st.latex(Statevector(statevector).draw(output="latex"))
+    noisy = st.checkbox("Enable Noise (Depolarizing)", value=False)
 
-        st.subheader("🔮 Bloch Sphere Visualizations")
-        for res in results:
-            st.markdown(f"### Qubit {res['qubit']}")
-            fig = plotly_bloch_sphere(res["bloch_vector"], res["purity"], res["length"])
-            st.plotly_chart(fig, use_container_width=True)
+    if st.button("Simulate & Visualize"):
+        with st.spinner("Running simulation..."):
+            results, statevector, dm, error = run_quantum_simulation(qc, noisy=noisy)
 
-            st.write(f"Purity = {res['purity']:.3f}, Length = {res['length']:.3f}")
+        if error:
+            st.error(f"Error: {error}")
+        else:
+            st.subheader("🧮 Statevector Representation")
+            st.latex(Statevector(statevector).draw(output="latex"))
 
-        st.subheader("📊 Measurement Simulation (1000 shots)")
-        qc.measure_all()
-        backend = Aer.get_backend("aer_simulator")
-        counts = backend.run(transpile(qc, backend), shots=1000).result().get_counts()
-        st.pyplot(plot_histogram(counts).figure)
+            st.subheader("🔮 Bloch Sphere Visualizations")
+            for res in results:
+                st.markdown(f"### Qubit {res['qubit']}")
+                fig = plotly_bloch_sphere(res["bloch_vector"], res["purity"], res["length"])
+                st.plotly_chart(fig, use_container_width=True)
 
-        # Export
-        st.download_button("Download Circuit QASM", qc.qasm(), file_name="circuit.qasm")
+                st.write(f"Purity = {res['purity']:.3f}, Length = {res['length']:.3f}")
+
+            st.subheader("📊 Measurement Simulation (1000 shots)")
+            qc.measure_all()
+            backend = Aer.get_backend("aer_simulator")
+            counts = backend.run(transpile(qc, backend), shots=1000).result().get_counts()
+            st.pyplot(plot_histogram(counts).figure)
+
+            # Export
+            st.download_button("Download Circuit QASM", qc.qasm(), file_name="circuit.qasm")
