@@ -3,7 +3,7 @@ from qiskit import QuantumCircuit, transpile
 from qiskit_aer import Aer
 from qiskit.visualization import plot_histogram
 from qiskit.quantum_info import DensityMatrix, partial_trace, Statevector
-from qiskit.providers.aer.noise import NoiseModel, depolarizing_error
+from qiskit_aer.noise import NoiseModel, depolarizing_error
 import numpy as np
 import plotly.graph_objects as go
 import matplotlib.pyplot as plt
