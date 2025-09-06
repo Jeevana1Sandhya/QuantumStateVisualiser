@@ -81,6 +81,15 @@ def plotly_bloch_sphere(bloch_vector, purity, length):
     )
     return go.Figure(data=data, layout=layout)
 
+def statevector_to_latex(sv: Statevector):
+    """Convert statevector into clean LaTeX ket notation."""
+    ket_str = ""
+    for i, amp in enumerate(sv.data):
+        if abs(amp) > 1e-6:
+            basis = format(i, f"0{sv.num_qubits}b")
+            ket_str += f"{amp:.2f}|{basis}⟩ + "
+    return ket_str[:-3]  # remove last '+'
+
 # ---------- Streamlit UI ----------
 
 st.title("🌀 Quantum State Visualizer")
@@ -127,9 +136,11 @@ elif mode == "Interactive Builder":
         elif gate == "RZ": qc.rz(angle, target)
         elif gate == "CX": qc.cx(control, target)
 
-if qc:
+if 'qc' in locals() and qc:
     st.subheader("Quantum Circuit Diagram")
-    st.pyplot(qc.draw(output="mpl"))
+    fig, ax = plt.subplots()
+    qc.draw(output="mpl", ax=ax)
+    st.pyplot(fig)
 
     noisy = st.checkbox("Enable Noise (Depolarizing)", value=False)
 
@@ -141,7 +152,8 @@ if qc:
             st.error(f"Error: {error}")
         else:
             st.subheader("🧮 Statevector Representation")
-            st.latex(Statevector(statevector).draw(output="latex"))
+            sv = Statevector(statevector)
+            st.latex(statevector_to_latex(sv))
 
             st.subheader("🔮 Bloch Sphere Visualizations")
             for res in results:
@@ -155,7 +167,8 @@ if qc:
             qc.measure_all()
             backend = Aer.get_backend("aer_simulator")
             counts = backend.run(transpile(qc, backend), shots=1000).result().get_counts()
-            st.pyplot(plot_histogram(counts).figure)
+            hist_fig = plot_histogram(counts)
+            st.pyplot(hist_fig.figure)
 
             # Export
             st.download_button("Download Circuit QASM", qc.qasm(), file_name="circuit.qasm")
